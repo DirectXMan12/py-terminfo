@@ -53,6 +53,7 @@ Alias = namedtuple('Alias', ['type', 'alias', 'actual_name', 'extension',
                              'description'])
 
 
+# loads from capabilities table
 class CapInfo(object):
     def __init__(self, flags=None, numbers=None, strings=None, aliases=None):
         self._flags = flags or []
@@ -158,19 +159,73 @@ class CapInfo(object):
         return cls(infos['flags'], infos['numbers'], infos['strings'], aliases)
 
 
-def load_cap_info(caps_file=None, cache_file=None):
+# loads from term.h
+class LimittedCapInfo(CapInfo):
+    @classmethod
+    def load(cls, content):
+        infos = {'flags': [], 'numbers': [], 'strings': []}
+        aliases = {'termcap': {}, 'terminfo': {}}
+        in_extensions = False
+        for line in content:
+            if not line.startswith('#define '):
+                if line.strip() == '#ifdef __INTERNAL_CAPS_VISIBLE':
+                    in_extensions = True
+
+                continue
+
+            if ('Booleans[' not in line and 'Numbers[' not in line and
+                    'Strings[' not in line):
+                continue
+
+            parts = line[8:].rstrip().split(None, 2)
+            if len(parts) < 3:
+                logging.warn('Skipping term.h line "%s"' % line)
+                continue
+
+            (var_name, _, spec_part) = parts
+
+            bracket_ind = spec_part.index('[')
+            cap_type = spec_part[:bracket_ind].lower()
+            if cap_type == 'booleans':
+                cap_type = 'flags'
+            else:
+                cap_type = cap_type
+
+            cap_ind = int(spec_part[bracket_ind + 1:-1])
+
+            info = Capability(cap_ind, None, var_name, cap_type, None, None,
+                              None, None, None, in_extensions)
+
+            if len(infos[cap_type]) != cap_ind:
+                raise Exception('Mismatched index -- expected index %s, got '
+                                'index %s' % (cap_ind, len(infos[cap_type])))
+
+            infos[cap_type].append(info)
+
+        return cls(infos['flags'], infos['numbers'], infos['strings'], aliases)
+
+
+def load_cap_info(caps_file=None, cache_file=None, use_term_h=False):
     if cache_file is not None:
         if os.path.exists(cache_file):
             with open(cache_file, 'rb') as f:
                 return pickle.load(f)
 
     if caps_file is None:
-        if cache_file is None:
-            raise Exception('No capabilities table file was specified, and '
-                            'no cache file was specified.')
-        else:
-            raise Exception('No capabilities table file was specified, and '
-                            'cache file "%s" does not exist.' % cache_file)
+        term_h = None
+        if use_term_h:
+            if use_term_h is True:
+                term_h = '/usr/include/term.h'
+            else:
+                term_h = use_term_h
+
+            if os.path.exists(term_h):
+                with open(term_h, 'r') as f:
+                    return LimittedCapInfo.load(f)
+
+        raise Exception('You must specify either a valid capabilities table '
+                        'file (%s), a valid cache file (%s), or a valid '
+                        'term.h file (%s).' % (caps_file, cache_file, term_h))
 
     with open(caps_file, 'r') as f:
         res = CapInfo.load(f)

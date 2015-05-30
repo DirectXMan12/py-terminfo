@@ -61,6 +61,9 @@ arg_parser.add_argument('-x', dest='show_extended', action='store_const',
                         const=True, default=False,
                         help='Print extended capabilities, similarly to the '
                              ' -x flag in infocmp from ncurses.')
+arg_parser.add_argument('-L', dest='use_long_names', action='store_const',
+                        const=True, default=False,
+                        help='Use log variable names as printed in term.h')
 arg_parser.add_argument('--cache-file', metavar='CACHE_FILE',
                         default=os.path.expanduser('~/.py-terminfo-caps-file'),
                         help='The cache file to use to store the capability '
@@ -75,19 +78,25 @@ if args.file is None and args.caps_file is None:
     sys.exit("You must at least specify either a capabilities file "
              "or a terminfo file.")
 
-cap_info = cap_info.load_cap_info(args.caps_file, args.cache_file)
+cap_info = cap_info.load_cap_info(args.caps_file, args.cache_file,
+                                  use_term_h=args.use_long_names)
 
 if args.file is None:
     sys.exit()
 
 with open(args.file, 'rb') as f:
     contents = f.read()
-    info = core.TermInfo(contents, cap_info, parse_extended=args.show_extended)
+    info = core.TermInfo(contents, cap_info, parse_extended=args.show_extended,
+                         use_variable_names=args.use_long_names)
 
 
     named_flags = sorted(info.flags)
     if args.show_extended:
         named_flags.extend(sorted(info.extended_flags))
+    elif args.use_long_names:
+        named_flags = [
+            flag for flag in info.flags
+            if not cap_info.flags.by_variable_name(flag).is_extension]
     else:
         named_flags = [flag for flag in info.flags
                        if not cap_info.flags.by_cap_name(flag).is_extension]
@@ -96,6 +105,10 @@ with open(args.file, 'rb') as f:
     if args.show_extended:
         named_numbers.extend(sorted((info.extended_numbers or {}).items(),
                              key=lambda i: i[0]))
+    elif args.use_long_names:
+        named_numbers = [
+            (number, v) for number, v in named_numbers if not (
+            cap_info.numbers.by_variable_name(number).is_extension)]
     else:
         named_numbers = [(number, v) for number, v in named_numbers if not (
                          cap_info.numbers.by_cap_name(number).is_extension)]
@@ -104,6 +117,10 @@ with open(args.file, 'rb') as f:
     if args.show_extended:
         named_strings.extend(sorted((info.extended_strings or {}).items(),
                              key=lambda i: i[0]))
+    elif args.use_long_names:
+        named_strings = [
+            (string, v) for string, v in named_strings if not (
+            cap_info.strings.by_variable_name(string).is_extension)]
     else:
         named_strings = [(string, v) for string, v in named_strings if not (
                          cap_info.strings.by_cap_name(string).is_extension)]

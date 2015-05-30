@@ -20,7 +20,14 @@ py-terminfo needs access to an ordered list of capability names to associate
 with raw capability values.  A utility is included
 (`py-terminfo-create-cache.py`)  that reads the capabilities file an creates
 a cached form suitable for use by py-terminfo (instead of keeping the capabilities
-file around)
+file around).
+
+If you do not have access to a capabilities file, a useable subset of the required
+information can be loaded from `term.h`.  Only the variable name and number are
+loaded, and you must pass `use_variable_names=True` to the `TermInfo` constructor.
+To load the information, pass `use_term_h=True` or `use_term_h='/path/to/term.h'`
+to `load_cap_info`.
+
 
 Usage
 -----

@@ -32,9 +32,10 @@ class ExtFlagsInfoProxy(collections.Set):
 
 
 class FlagsCapInfoProxy(collections.Set):
-    def __init__(self, info, caps):
+    def __init__(self, info, caps, use_variable_names=False):
         self._info = info
         self._caps = caps
+        self._use_variable_names = use_variable_names
 
     def __contains__(self, flag):
         return self._caps.get(flag, False)
@@ -44,7 +45,10 @@ class FlagsCapInfoProxy(collections.Set):
             if not cap:
                 continue
             else:
-                yield self._info[ind].name
+                if self._use_variable_names:
+                    yield self._info[ind].variable_name
+                else:
+                    yield self._info[ind].name
 
     def __len__(self):
         return sum(cap for cap in self._caps)
@@ -54,10 +58,11 @@ class FlagsCapInfoProxy(collections.Set):
 
 
 class CapInfoProxy(collections.Mapping):
-    def __init__(self, type, info, caps):
+    def __init__(self, type, info, caps, use_variable_names=False):
         self._info = info
         self._caps = caps
         self._type = type
+        self._use_variable_names = use_variable_names
 
     def __getitem__(self, key):
         info = self._info.by_variable_name(key, None)
@@ -80,7 +85,10 @@ class CapInfoProxy(collections.Mapping):
             if cap is None:
                 continue
             else:
-                yield self._info[ind].name
+                if self._use_variable_names:
+                    yield self._info[ind].variable_name
+                else:
+                    yield self._info[ind].name
 
     def __len__(self):
         return sum(cap is not None for cap in self._caps)
@@ -117,8 +125,9 @@ class ExtInfoProxy(collections.Mapping):
 
 
 class TermInfo(object):
-    def __init__(self, contents, cap_info, parse_extended=True):
+    def __init__(self, contents, cap_info, parse_extended=True, use_variable_names=False):
         self._parse_extended = parse_extended
+        self._use_variable_names = use_variable_names
         self.has_extended_capabilities = False
 
         self.names = None
@@ -159,7 +168,8 @@ class TermInfo(object):
 
         if self._flags_proxy is None:
             self._flags_proxy = FlagsCapInfoProxy(self._cap_info.flags,
-                                                  self._flags)
+                                                  self._flags,
+                                                  self._use_variable_names)
 
         return self._flags_proxy
 
@@ -171,7 +181,8 @@ class TermInfo(object):
         if self._numbers_proxy is None:
             self._numbers_proxy = CapInfoProxy('numbers',
                                                self._cap_info.numbers,
-                                               self._numbers)
+                                               self._numbers,
+                                               self._use_variable_names)
 
         return self._numbers_proxy
 
@@ -183,7 +194,8 @@ class TermInfo(object):
         if self._strings_proxy is None:
             self._strings_proxy = CapInfoProxy('strings',
                                                self._cap_info.strings,
-                                               self._strings)
+                                               self._strings,
+                                               self._use_variable_names)
 
         return self._strings_proxy
 
