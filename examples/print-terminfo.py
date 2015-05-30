@@ -5,6 +5,8 @@ import sys
 import os
 import argparse
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from terminfo import core
 from terminfo import cap_info
 
@@ -82,19 +84,29 @@ with open(args.file, 'rb') as f:
     contents = f.read()
     info = core.TermInfo(contents, cap_info, parse_extended=args.show_extended)
 
+
     named_flags = sorted(info.flags)
     if args.show_extended:
         named_flags.extend(sorted(info.extended_flags))
+    else:
+        named_flags = [flag for flag in info.flags
+                       if not cap_info.flags.by_cap_name(flag).is_extension]
 
     named_numbers = sorted(info.numbers.items(), key=lambda i: i[0])
     if args.show_extended:
         named_numbers.extend(sorted((info.extended_numbers or {}).items(),
                              key=lambda i: i[0]))
+    else:
+        named_numbers = [(number, v) for number, v in named_numbers if not (
+                         cap_info.numbers.by_cap_name(number).is_extension)]
 
     named_strings = sorted(info.strings.items(), key=lambda i: i[0])
     if args.show_extended:
         named_strings.extend(sorted((info.extended_strings or {}).items(),
                              key=lambda i: i[0]))
+    else:
+        named_strings = [(string, v) for string, v in named_strings if not (
+                         cap_info.strings.by_cap_name(string).is_extension)]
 
     print('|'.join(info.names).rstrip() + ',')
     print(wrap(named_flags))

@@ -45,7 +45,8 @@ class CapTypeInfo(Sequence):
 _CAP_TYPES = {'bool': 'flags', 'num': 'numbers', 'str': 'strings'}
 Capability = namedtuple('Capability', ['number', 'name', 'variable_name',
                                        'type', 'old_cap_name', 'key_name',
-                                       'key_value', 'versions', 'description'])
+                                       'key_value', 'versions', 'description',
+                                       'is_extension'])
 
 _ALIAS_TYPES = {'capalias': 'termcap', 'infoalias': 'terminfo'}
 Alias = namedtuple('Alias', ['type', 'alias', 'actual_name', 'extension',
@@ -100,8 +101,12 @@ class CapInfo(object):
         counts = {'flags': 0, 'numbers': 0, 'strings': 0}
         aliases = {'termcap': {}, 'terminfo': {}}
         infos = {'flags': [], 'numbers': [], 'strings': []}
+        in_extensions = False
         for line in content:
             if line[0] == '#':
+                if line[2:].strip() == '%%-STOP-HERE-%%':
+                    in_extensions = True
+
                 continue
             elif '# ' in line:
                 line = line[:line.index('# ')]
@@ -144,7 +149,8 @@ class CapInfo(object):
 
                 info = Capability(counts[type_name], cap_name, var_name,
                                   type_name, tcap_cap_name, key_name,
-                                  key_value, versions, cap_desc.rstrip())
+                                  key_value, versions, cap_desc.rstrip(),
+                                  in_extensions)
 
                 infos[type_name].append(info)
                 counts[type_name] += 1
