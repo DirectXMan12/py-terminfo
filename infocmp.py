@@ -8,15 +8,21 @@ from terminfo import core
 from terminfo import cap_info
 
 
+if bytes == str:
+    byte = chr
+else:
+    byte = lambda b: bytes([b])
+
+
 def escape_str(input_str):
-    input_str = input_str.replace('\x1b', r'\E')
-    input_str = input_str.replace('\0', r'\0')
-    input_str = input_str.replace('\x7f', r'\x7f')
+    input_str = input_str.replace(b'\x1b', b'\\E')
+    input_str = input_str.replace(b'\0', b'\\0')
+    input_str = input_str.replace(b'\x7f', b'\\x7f')
 
     for i in range(1, 32):
-        input_str = input_str.replace(chr(i), '^%s' % chr(i + 64))
+        input_str = input_str.replace(byte(i), b'^' + byte(i + 64))
 
-    return input_str
+    return input_str.decode()
 
 
 def wrap(input_items):
@@ -48,7 +54,8 @@ arg_parser = argparse.ArgumentParser(
 arg_parser.add_argument('file', metavar='TERMINFO_FILE', default=None,
                         nargs='?', help='The binary terminfo file from which '
                                         ' to load the information.')
-arg_parser.add_argument('-x', dest='show_extended',
+arg_parser.add_argument('-x', dest='show_extended', action='store_const',
+                        const=True, default=False,
                         help='Print extended capabilities, similarly to the '
                              ' -x flag in infocmp from ncurses.')
 arg_parser.add_argument('--cache-file', metavar='CACHE_FILE',
@@ -65,44 +72,31 @@ if args.file is None and args.caps_file is None:
     sys.exit("You must at least specify either a capabilities file "
              "or a terminfo file.")
 
-cap_info.load_cap_info(args.caps_file, args.cache_file)
+cap_info = cap_info.load_cap_info(args.caps_file, args.cache_file)
 
 if args.file is None:
     sys.exit()
 
 with open(args.file, 'rb') as f:
     contents = f.read()
-    info = core.parse_terminfo(contents)
+    info = core.TermInfo(contents, cap_info, parse_extended=args.show_extended)
 
-    named_flags = {}
-    for ind, val in enumerate(info.flags):
-        named_flags[cap_info.CAP_NAMES['flags'][ind]] = val
-
-    named_flags = sorted(named_flags.items(), key=lambda i: i[0])
+    named_flags = sorted(info.flags)
     if args.show_extended:
-        named_flags.extend(sorted((info.extended_flags or {}).items(),
-                           key=lambda i: i[0]))
+        named_flags.extend(sorted(info.extended_flags))
 
-    named_numbers = {}
-    for ind, val in enumerate(info.numbers):
-        named_numbers[cap_info.CAP_NAMES['numbers'][ind]] = val
-
-    named_numbers = sorted(named_numbers.items(), key=lambda i: i[0])
+    named_numbers = sorted(info.numbers.items(), key=lambda i: i[0])
     if args.show_extended:
         named_numbers.extend(sorted((info.extended_numbers or {}).items(),
                              key=lambda i: i[0]))
 
-    named_strings = {}
-    for ind, val in enumerate(info.strings):
-        named_strings[cap_info.CAP_NAMES['strings'][ind]] = val
-
-    named_strings = sorted(named_strings.items(), key=lambda i: i[0])
+    named_strings = sorted(info.strings.items(), key=lambda i: i[0])
     if args.show_extended:
         named_strings.extend(sorted((info.extended_strings or {}).items(),
                              key=lambda i: i[0]))
 
     print('|'.join(info.names).rstrip() + ',')
-    print(wrap(name for name, val in named_flags if val))
+    print(wrap(named_flags))
     print(wrap('%s#%s' % (name, val)
                for name, val in named_numbers if val is not None))
     print(wrap('%s=%s' % (name, escape_str(val))
